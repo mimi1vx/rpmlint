@@ -10,12 +10,10 @@
 
 import contextlib
 import getopt
-import importlib
 import locale
 import os
 import stat
 import sys
-import tempfile
 
 # Do not import anything that initializes its global variables from
 # Config at load time here (or anything that imports such a thing),
@@ -23,48 +21,12 @@ import tempfile
 # loaded which is too early - settings from config files won't take
 # place for those variables.
 
-from rpmlint.version import __version__
 from rpmlint import pkg as Pkg
 from rpmlint.checks.AbstractCheck import AbstractCheck
 from rpmlint.config import Config
 from rpmlint.filter import Filter
 from rpmlint.helpers import print_warning
 
-
-# Print usage information
-def usage(name):
-    print("""usage: %s [<options>] <rpm files|installed packages|specfiles|dirs>
-  options:
-\t[-i|--info]
-\t[-I|--explain <messageid>]
-\t[-c|--check <check>]
-\t[-a|--all]
-\t[-C|--checkdir <checkdir>]
-\t[-h|--help]
-\t[-v|--verbose]
-\t[-E|--extractdir <dir>]
-\t[-V|--version]
-\t[-n|--noexception]
-\t[-f|--file <user config file to use>]
-\t[-o|--option <key value>]"""
-          % (name))
-
-
-# Print version information
-def printVersion():
-    print('rpmlint version %s' % __version__)
-
-
-def loadCheck(name, config, output):
-    """Load a (check) module by its name, unless it is already loaded."""
-    # Avoid loading more than once (initialization costs)
-    loaded = sys.modules.get(name)
-    if loaded:
-        return
-    module = importlib.import_module('.{}'.format(name), package='rpmlint.checks')
-    klass = getattr(module, name)
-    obj = klass(config, output)
-    return obj
 
 
 #############################################################################
@@ -202,7 +164,6 @@ def runChecks(pkg):
     for name in cfg.configuration['Checks']:
         check = AbstractCheck.known_checks.get(name)
         if check:
-            check.verbose = verbose
             check.check(pkg)
         else:
             print_warning('(none): W: unknown check %s, skipping' % name)
@@ -212,105 +173,6 @@ def runSpecChecks(pkg, fname, spec_lines=None):
     for name in cfg.configuration['Checks']:
         check = AbstractCheck.known_checks.get(name)
         if check:
-            check.verbose = verbose
             check.check_spec(pkg, fname, spec_lines)
         else:
             print_warning('(none): W: unknown check %s, skipping' % name)
-
-
-#############################################################################
-#
-#############################################################################
-
-argv0 = os.path.basename(sys.argv[0])
-
-# parse options
-try:
-    (opt, args) = getopt.getopt(
-        sys.argv[1:], 'iI:c:C:hVvanE:f:o:',
-        ['info', 'explain=', 'check=', 'help', 'version',
-         'verbose', 'all', 'noexception', 'extractdir=', 'file=', 'option=',
-         ])
-except getopt.GetoptError as e:
-    print_warning('%s: %s' % (argv0, e))
-    usage(argv0)
-    sys.exit(1)
-
-# process options
-checks = []
-verbose = False
-extract_dir = None
-info_error = set()
-
-config_overrides = {}
-
-# load global config files
-cfg = Config()
-extract_dir = cfg.configuration['ExtractDir']
-
-# process command line options
-for o in opt:
-    if o[0] in ('-c', '--check'):
-        checks.append(o[1])
-    elif o[0] in ('-i', '--info'):
-        cfg.info = True
-    elif o[0] in ('-I', '--explain'):
-        # split by comma for deprecated backwards compatibility with < 1.2
-        info_error.update(o[1].split(','))
-    elif o[0] in ('-h', '--help'):
-        usage(argv0)
-        sys.exit(0)
-    elif o[0] in ('-v', '--verbose'):
-        verbose = True
-    elif o[0] in ('-V', '--version'):
-        printVersion()
-        sys.exit(0)
-    elif o[0] in ('-E', '--extractdir'):
-        extract_dir = o[1]
-        cfg.configuration['ExtractDir'] = extract_dir
-    elif o[0] in ('-n', '--noexception'):
-        cfg.no_exception = True
-    elif o[0] in ('-a', '--all'):
-        if '*' not in args:
-            args.append('*')
-    elif o[0] in ('-f', '--file'):
-        cfg.load_config(o[1])
-    elif o[0] in ('-o', '--option'):
-        kv = o[1].split(None, 1)
-        if len(kv) == 1:
-            config_overrides[kv[0]] = None
-        else:
-            config_overrides[kv[0]] = eval(kv[1])
-
-# apply config overrides
-for key, value in config_overrides.items():
-    cfg.configuration[key] = value
-
-if not extract_dir:
-    extract_dir = tempfile.gettempdir()
-
-if info_error:
-    cfg.info = True
-    output = Filter(cfg)
-    for c in checks:
-        cfg.add_check(c)
-    for c in cfg.configuration['Checks']:
-        loadCheck(c, cfg, output)
-    for e in sorted(info_error):
-        print('{}:'.format(e))
-        print(output.get_description(e))
-    sys.exit(0)
-
-# if no argument print usage
-if not args:
-    usage(argv0)
-    sys.exit(1)
-
-if __name__ == '__main__':
-    if checks:
-        cfg.reset_checks()
-        for check in checks:
-            cfg.add_check(check)
-    main()
-
-# rpmlint ends here
