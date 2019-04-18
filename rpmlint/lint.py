@@ -10,10 +10,9 @@ class Lint(object):
     Generic object handling the basic rpmlint operations
     """
 
-    checks = {}
-
     def __init__(self, options):
         # initialize configuration
+        self.checks = {}
         self.options = options
         if options['config']:
             self.config = Config(options['config'])
@@ -31,6 +30,14 @@ class Lint(object):
         # if we just want to print config, do so and leave
         if self.options['print_config']:
             self.print_config()
+            return 0
+        # just explain the error and abort too
+        if self.options['explain']:
+            explanation = self.output.get_description(self.options['explain'])
+            if explanation:
+                print(explanation)
+            else:
+                print('Unknown message {}, or no known description'.format(self.options['explain']))
             return 0
 
     def info_error(self, errors):
