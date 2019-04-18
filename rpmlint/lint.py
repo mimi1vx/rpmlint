@@ -33,11 +33,7 @@ class Lint(object):
             return 0
         # just explain the error and abort too
         if self.options['explain']:
-            explanation = self.output.get_description(self.options['explain'])
-            if explanation:
-                print(explanation)
-            else:
-                print('Unknown message {}, or no known description'.format(self.options['explain']))
+            self.print_explanation(self.options['explain'])
             return 0
 
     def info_error(self, errors):
@@ -50,7 +46,20 @@ class Lint(object):
             print(self.output.get_description(e))
 
     def print_config(self):
+        """
+        Just output the current configuration
+        """
         self.config.print_config()
+
+    def print_explanation(self, message):
+        """
+        Print out detailed explanation for the specified message
+        """
+        explanation = self.output.get_description(message)
+        if explanation:
+            print(explanation)
+        else:
+            print('Unknown message {}, or no known description'.format(message))
 
     def load_checks(self):
         """
