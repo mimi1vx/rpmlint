@@ -1,8 +1,10 @@
 import importlib
+import sys
 from tempfile import gettempdir
 
 from rpmlint.config import Config
 from rpmlint.filter import Filter
+from rpmlint.helpers import print_warning
 
 
 class Lint(object):
@@ -35,6 +37,9 @@ class Lint(object):
         if self.options['explain']:
             self.print_explanation(self.options['explain'])
             return 0
+        # if no exclusive option is passed then just loop over all the
+        # arguments that are supposed to be either rpm or spec files
+        return self.validate_files(self.options['rpmfile'])
 
     def info_error(self, errors):
         """
@@ -44,6 +49,32 @@ class Lint(object):
         for e in sorted(errors):
             print(f'{e}:')
             print(self.output.get_description(e))
+
+    def validate_files(self, files):
+        """
+        Run all the check for passed file list
+        """
+        if not files:
+            print('There are no files to process nor additional arguments.', file=sys.stderr)
+            print('Nothing to do, aborting.', file=sys.stderr)
+            return 2
+        for pkg in files:
+            self.validate_file(pkg)
+        return 0
+
+    def validate_file(self, pkg):
+        try:
+            if pkg.endswith('.rpm') or \
+               pkg.endswith('.spm'):
+                with Pkg.Pkg(fname, extract_dir) as pkg:
+                    runChecks(pkg)
+                packages_checked += 1
+            elif fname.endswith('.spec'):
+                with Pkg.FakePkg(fname) as pkg:
+                    runSpecChecks(pkg, fname)
+                specfiles_checked += 1
+        except Exception as e:
+            print_warning(f'(none): E: while reading {pkg}: {e}')
 
     def print_config(self):
         """
@@ -59,7 +90,7 @@ class Lint(object):
         if explanation:
             print(explanation)
         else:
-            print('Unknown message {}, or no known description'.format(message))
+            print(f'Unknown message {message}, or no known description')
 
     def load_checks(self):
         """
@@ -74,7 +105,7 @@ class Lint(object):
 
     def load_check(self, name):
         """Load a (check) module by its name, unless it is already loaded."""
-        module = importlib.import_module('.{}'.format(name), package='rpmlint.checks')
+        module = importlib.import_module(f'.{name}', package='rpmlint.checks')
         klass = getattr(module, name)
         obj = klass(self.config, self.output)
         return obj
