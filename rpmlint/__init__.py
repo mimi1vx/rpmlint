@@ -85,18 +85,21 @@ def process_lint_args(argv):
     # make sure config exist
     if options.config:
         if not os.path.exists(options.config):
-            print(f'User specified configuration \'{options.config}\' does not exist')
+            print(f'User specified configuration \'{options.config}\' does not exist', file=sys.stderr)
             exit(2)
     # make sure rpmlintrc exists
     if options.rpmlintc:
         if not os.path.exists(options.rpmlintrc):
-            print(f'User specified rpmlintrc \'{options.rpmlintrc}\' does not exist')
+            print(f'User specified rpmlintrc \'{options.rpmlintrc}\' does not exist', file=sys.stderr)
             exit(2)
     # validate all the rpmlfile options to be either file or folder
+    invalid_found = False
     for item in options.rpmfile:
         if not os.path.exists(item):
-            print(f'The file or directory \'{item}\' does not exist')
-            exit(2)
+            print(f'The file or directory \'{item}\' does not exist', file=sys.stderr)
+            invalid_found = True
+    if invalid_found:
+        exit(2)
 
     # convert options to dict
     options_dict = vars(options)
