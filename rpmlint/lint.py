@@ -1,6 +1,7 @@
 import importlib
 import sys
 from tempfile import gettempdir
+from concurrent.futures import ThreadPoolExecutor, wait
 
 from rpmlint.config import Config
 from rpmlint.filter import Filter
@@ -58,8 +59,9 @@ class Lint(object):
             print('There are no files to process nor additional arguments.', file=sys.stderr)
             print('Nothing to do, aborting.', file=sys.stderr)
             return 2
-        for pkg in files:
-            self.validate_file(pkg)
+        with ThreadPoolExecutor as executor:
+            futures = [executor.submit(self.validate_file, pkg) for pkg in files]
+        wait(futures)
         return 0
 
     def validate_file(self, pkg):
